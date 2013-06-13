@@ -1,0 +1,48 @@
+#!/usr/bin/env ruby
+
+begin
+		require 'skyrack/gadget_db'
+rescue LoadError
+		require 'rubygems'
+		require 'skyrack/gadget_db'
+end
+
+# {{{ arg parsing
+require 'optparse'
+
+def exit_with_arg_error(opts, str=nil)
+    puts str if str
+    puts opts
+    exit 1
+end
+
+
+$verbosity = 0
+opt = {}
+opt[:db] = { :type => nil }
+
+args = {}
+
+opts = OptionParser.new do |opts|
+    opts.banner = "Usage : %s [opts] addr[,addr2[,addr3[,...]]]" % File.basename(__FILE__)
+
+    opts.separator "General options"
+    opts.on("-v", "--verbosity", "Use more than once to increase verbosity") { $verbosity += 1 }
+    opts.on("-f", "--file FILENAME", String, "sqlite3 db") { |f| opt[:db][:type] = :sqlite; opt[:db][:filename] = f }
+
+    opts.separator "Search options"
+    opts.on("-d", "--description DESC", String, "instruction description") { |d| args[:desc] = d }
+    opts.on("-r", "--role INST", String, "instruction") { |r| args[:role] = r }
+end
+
+
+opts.parse!
+
+# }}} end of arg parsing
+
+db = GadgetDb.new(opt[:db][:filename])
+
+db.find_interesting(nil) do |g|
+  puts g.to_s
+end
+

@@ -1,0 +1,50 @@
+#!/usr/bin/env ruby
+begin
+		require 'skyrack/gadget_db'
+rescue LoadError
+		require 'rubygems'
+		require 'skyrack/gadget_db'
+end
+
+# {{{ arg parsing
+require 'optparse'
+
+$verbosity = 0
+opt = { :db => {}}
+opt[:type] = 'png'
+
+opts = OptionParser.new do |opts|
+    opts.banner = "Usage : %s addr" % File.basename(__FILE__)
+    opts.banner = "addr should be : 0x[base 16] or [base 10]"
+
+    opts.separator "General options"
+    opts.on("-v", "--verbosity", "Use more than once to increase verbosity") { $verbosity += 1 }
+    opts.on("-f", "--file FILENAME", String, "sqlite3 db") { |f| opt[:db][:type] = :sqlite; opt[:db][:filename] = f }
+    opts.on("-t", "--type TYPE", String, "dot, jpg, png, gif...") { |t| opt[:type] = t }
+end
+
+opts.parse!
+
+# }}} end of arg parsing
+
+db = GadgetDb.new(opt[:db][:filename])
+
+addr = ARGV[0].to_i( ARGV[0].index('0x') ? 16 : 10 )
+
+gadget_graph = db.gadget_build( addr )
+
+if $verbosity > 0 then
+
+		for addr in gadget_graph.vertices.map {|i| i.addr }.uniq.sort
+				puts "addr %x" % addr
+				list = db.instr_list_build( addr )
+				for instr in list
+						puts "0x%06x  %12s  %s" % [instr.addr, instr.bin.unpack('C*').map {|i| i.to_s 16}.join, instr]
+				end		
+		end		
+
+end
+
+puts gadget_graph.write_to_graphic_file(opt[:type], 'ret_0x%x' % gadget_graph.ret_addr)
+
+

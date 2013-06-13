@@ -1,0 +1,3 @@
+module Skyrack
+    # Your code goes here...
+end

@@ -1,0 +1,10 @@
+irb -rrubygems -rskyrack -rskyrack/instr
+
+# ree-1.8.7-2011.03 :002 > Instr.as("nop")
+# => #<Instr:0x2dd0930 @bin_length=1, @size=1, @dis=nil, @bin="\220",
+# @instr=#<Metasm::DecodedInstruction:0x2d8d3b0 @bin_length=1, @address=0,
+# @opcode=#<Metasm::Opcode:0x2f7a768 @args=[], @bin_mask=[255], @props={},
+# @bin=[144], @fields={}, @name="nop">,
+# @instruction=#<Metasm::Instruction:0x2cf7180 @args=[], @opname="nop",
+# @cpu=#<Metasm::Ia32:17ff5fc ... >, @backtrace=nil>>, @addr=0> 
+

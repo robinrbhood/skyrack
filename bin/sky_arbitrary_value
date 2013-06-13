@@ -1,0 +1,75 @@
+#!/usr/bin/env ruby
+
+begin
+		require 'skyrack/gadget_db'
+		require 'skyrack/functions'
+rescue LoadError
+		require 'rubygems'
+		require 'skyrack/gadget_db'
+		require 'skyrack/functions'
+end
+
+
+
+# {{{ arg parsing
+require 'optparse'
+
+def exit_with_arg_error(opts, str=nil)
+    puts str if str
+    puts opts
+    exit 1
+end
+
+
+$verbosity = 0
+opt = {}
+opt[:db] = {}
+opt[:binary] = false
+
+dest = nil
+
+opts = OptionParser.new do |opts|
+    opts.banner = "Usage : %s [opts] reg value" % File.basename(__FILE__)
+
+    opts.separator "General options"
+    opts.on("-f", "--file FILENAME", String, "sqlite3 db") { |f| opt[:db][:type] = :sqlite; opt[:db][:filename] = f }
+    opts.on("-v", "--verbosity", "Use more than once to increase verbosity") { $verbosity += 1 }
+
+    opts.separator "Function options"
+    opts.on("-d", "--dest REG", String, "instruction description") { |d| dest = d }
+
+    opts.separator "Output options"
+    opts.on("-b", "--binary", "output in binary form") { |d| opt[:binary] = true }
+end
+
+
+opts.parse!
+
+if opt[:db][:filename].nil? then
+  puts opts
+  exit 1
+end
+
+# }}} end of arg parsing
+
+db = GadgetDb.byname_or_default(opt[:db][:filename])
+
+dest = db.reg_from_str(dest).to_s if dest
+value = ARGV[0].to_i(16)
+
+exit_with_arg_error(opts, "no value given") if ARGV.size != 1
+
+f = Functions.new(db)
+
+addrs = f.set_to_arbitrary_value(value, dest)
+
+addrs.each do |a|
+    if opt[:binary] then
+        $stdout.write a[1].to_b
+    else
+        puts a[1].to_s
+    end
+end
+
+
+$stdout.flush if opt[:binary]

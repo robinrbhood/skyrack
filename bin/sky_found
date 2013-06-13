@@ -1,0 +1,81 @@
+#!/usr/bin/env ruby
+
+begin
+		require 'skyrack/gadget_db'
+		require 'skyrack/functions'
+rescue LoadError
+		require 'rubygems'
+		require 'skyrack/gadget_db'
+		require 'skyrack/functions'
+end
+
+# {{{ arg parsing
+require 'optparse'
+
+def exit_with_arg_error(opts, str=nil)
+		puts str if str
+		puts opts
+		exit 1
+end
+
+
+$verbosity = 0
+opt = {}
+opt[:db] = {}
+
+args = {}
+args[:value] = 0
+args[:action] = :add
+
+opts = OptionParser.new do |opts|
+		opts.banner = "Usage : %s [opts] addr [addr2 [addr3 [...]]]" % File.basename(__FILE__)
+		opts.banner = "adds an address with an eventual description to the list of itnteresting addresses"
+
+		opts.separator "General options"
+		opts.on("-v", "--verbosity", "Use more than once to increase verbosity") { $verbosity += 1 }
+		opts.on("-f", "--file FILENAME", String, "sqlite3 db") { |f| opt[:db][:type] = :sqlite; opt[:db][:filename] = f }
+
+		opts.separator "Function characteristics"
+		opts.on("-d", "--description DESC", String, "instruction description") { |d| args[:desc] = d }
+		opts.on(      "--dest REG", String, "affected register") { |d| args[:dest] = d }
+		opts.on(      "--value VALUE", OptionParser::OctalInteger, "engaged value") { |v| args[:value] = v }
+
+		opts.separator "Database management"
+		opts.on("-e", "--export", "export database")							 { args[:action] = :export }
+		opts.on(      "--delete", "delete a recorded instruction") { args[:action] = :delete }
+
+		opts.separator ""
+		opts.separator "Available functions:"
+		opts.separator Functions.functions.inspect
+
+end
+
+
+opts.parse!
+
+exit_with_arg_error(opts, "no description given") if args[:action] == :add and args[:desc].nil?
+exit_with_arg_error(opts, "no gadget address given") if ARGV.size == 0
+
+ARGV.map { |a| a.to_i(16) }.each do |addr|
+		exit_with_arg_error(opts, "Error: provided address is nil or 0") if addr.nil? or addr == 0
+end
+
+# }}} end of arg parsing
+
+db = GadgetDb.new(opt[:db][:filename], { :write => true })
+
+case args[:action]
+when :export
+		db.export
+when :delete
+		print "are you sure you want to delete %s ? (yes/NO) " % ARGV.inspect
+		exit(1) unless $stdin.gets().strip.downcase == 'yes'
+		ARGV.each do |addr|
+				db.delete_interesting(addr)
+		end
+when :add
+		args[:dest] = db.reg_from_str(args[:dest]).to_s if args[:dest]
+		db.save_function(ARGV.map { |a| a.to_i(16) }, args)
+end
+
+

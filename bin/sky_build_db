@@ -1,0 +1,138 @@
+#!/usr/bin/env ruby
+
+begin
+    require 'skyrack/roper'
+    require 'skyrack/gadget_db'
+    require 'skyrack/version'
+rescue LoadError
+    require 'rubygems'
+    require 'skyrack/roper'
+    require 'skyrack/gadget_db'
+    require 'skyrack/version'
+end
+
+require 'fileutils'
+
+require 'rubygems'
+require 'rgl/dot'
+
+# {{{ arg parsing
+require 'optparse'
+opt = {}
+opt[:depth] = 5
+opt[:type] = 'dot'
+opt[:dir] = '.'
+opt[:write_gadgets] = false
+opt[:addr] = nil
+opt[:info] = false
+
+opts = OptionParser.new do |opts|
+    opts.version = Skyrack::VERSION
+
+    opts.banner  = "Usage : #{opts.program_name} [options] file_to_scan\n"
+    opts.banner += "        " + opts.ver
+
+    opts.separator("\nBefore building gadget database, you may want to...")
+    opts.on("-i",   "--info", "display bin informations")                      { opt[:info] = true }
+
+    opts.separator("")
+    opts.separator "Generic options"
+    opts.on("-v", "--verbosity", "Use more than once to increase verbosity")   {     $verbosity += 1 }
+    opts.on(    "--macho ARCH", "File to scan is Mac OS Universal Binary")     { |a| opt[:bin] = a }
+
+    opts.separator("")
+    opts.separator("Search options")
+    opts.on("-d", "--depth DEPTH", Integer, "scan DEPTH instr after ret - the higher the better & slower"){ |d|	opt[:depth] = d }
+    opts.on("-a", "--address ADDR", String, "search gadgets ending at @addr")  { |a| opt[:addr] = a.to_i(16) }
+
+    opts.separator("")
+    opts.separator("Gadgets graphs")
+    opts.on("-o", "--output directory", "directory images should be written")  { |d| opt[:dir] = d }
+    opts.on("-g", "--gadgets", "write graph of every ret")                     {     opt[:write_gadgets] = true }
+    opts.on("-t", "--type format", "format output, ex: dot, png")              { |t| opt[:type] = t } 
+end
+
+opts.parse!
+if ARGV.size == 0 then
+    puts opts
+    exit 1
+end
+
+
+unless File.directory?(opt[:dir]) then
+    if File.exists?(opt[:dir]) then
+        $stderr.puts "file %s exists" % opt[:dir]
+        exit(1)
+    else
+        $stderr.puts "creating directory %s" % opt[:dir]
+        FileUtils::mkdir(opt[:dir])
+    end
+end
+
+opt[:filename] = ARGV[0]
+
+
+# }}} end of arg parsing
+
+def puts_infos(m)
+    puts m.header.type if m.is_a? Metasm::ELF
+    puts m.header.machine
+    puts m.cpu.class
+    Instr.cpu = m.cpu
+    puts "image base addr: 0x%x" % m.base_addr if m.is_a? Metasm::COFF
+    m.sky_each_section do |s, s_addr|
+        puts "%s - executable: %s" % [s.to_s, s.executable?]
+        RopSection::RETS.each do |hex, info|
+            puts "\t%d ret (%x)" % [s.get_addr_of(hex).size, hex]
+        end
+        s.get_rets().each do |ret, indexes|
+            puts "%s\t%d" % [ret, indexes.size]
+        end
+    end
+    exit(0)
+end
+
+
+puts "Decoding %s..." % opt[:filename]
+m = Metasm::AutoExe.decode_file(opt[:filename])
+puts "decoding done."
+
+if m.class == Metasm::MachO then
+    begin
+    rescue Metasm::InvalidExeFormat => e
+        m = Metasm::UniversalBinary.decode_file(opt[:filename])
+        m.archive.each_with_index do |ar, idx|
+            puts "%d - %s \t(%d KB)" % [idx, ar.cputype, ar.size / 1024]
+        end
+        print " please choose which lib you want to process > "
+        m = m[$stdin.gets.strip.to_i]
+        puts "%s choosen" % m.class
+    end
+end
+
+puts_infos(m) if opt[:info]
+
+db_file = "%s_%s_%s.sqlite3" % [File.join(opt[:dir], File::basename(opt[:filename])), m.class.to_s.gsub(/.*::/, ''), m.cpu.class.to_s.split('::').last.downcase]
+
+begin
+    db = GadgetDb.new(db_file, m)
+rescue GadgetDbException => e
+    $stderr.puts "Error: %s" % e.to_s
+    exit(-1)
+end
+puts "saving results in %s" % db_file
+
+
+if opt[:addr] then
+    puts "addr 0x%x given, looking only here." % opt[:addr]
+    gadget = m.find_gadgets_ending_at(opt[:addr] - m.base_addr , opt[:depth])
+    raise "no section for addr 0x%x" % opt[:addr] if gadget.nil?
+    db.save_gadget(gadget)
+else
+    m.each_gadget_graph(opt[:depth]) do |gadget, addr|
+        db.save_gadget(gadget)
+    end
+end
+
+db.close
+

@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+
+
+# {{{ arg parsing
+require 'optparse'
+opt = {}
+opt[:translation] = nil
+opt[:size] = 64
+opt[:file] = nil
+
+opts = OptionParser.new do |opts|
+    opts.banner = "Usage : #{File.basename(__FILE__)} [opts] translation file"
+
+    opts.separator("Before building gadget database, you may want to...")
+    opts.separator("")
+    opts.on("-v", "--verbosity", "Use more than once to increase verbosity")			{			$verbosity += 1 }
+
+    opts.on("-s",                         Integer, "in bits, size of addres") { |f| opt[:size] = f } end
+
+opts.parse!
+if ARGV.size != 2 then
+    puts opts
+    exit 1
+end
+
+opt[:translation] = ARGV[0].to_i(16)
+opt[:file] = ARGV[1]
+
+#  C  | Integer |  8-bit unsigned integer (unsigned char)
+#  S  | Integer | 16-bit unsigned integer, native endian (uint16_t)
+#  L  | Integer | 32-bit unsigned integer, native endian (uint32_t)
+#  Q  | Integer | 64-bit unsigned integer, native endian (uint64_t)
+
+# puts opt[:translation].class
+
+initial = File.read(opt[:file]).unpack('Q*')
+res = initial.map {|a| a + opt[:translation]}
+# puts res.inspect
+$stdout.write res.pack('Q*')
+$stdout.flush
+

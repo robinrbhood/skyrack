@@ -1,0 +1,110 @@
+#!/usr/bin/env ruby
+begin
+    require 'skyrack/roper'
+    require 'skyrack/gadget_db'
+    require 'skyrack/version'
+rescue LoadError
+    require 'rubygems'
+    require 'skyrack/roper'
+    require 'skyrack/gadget_db'
+    require 'skyrack/version'
+end
+
+# {{{ arg parsing
+require 'optparse'
+
+def exit_with_arg_error(opts, str=nil)
+    puts str if str
+    puts opts
+    exit 1
+end
+
+def check_registers_args(search, db)
+		for reg in [:src, :dst, :preserve] do
+				next if not search[reg] or search[reg].inject(true) { |b, a| b &= (db.regs + ['regs']).include?(a) }
+				msg = ""
+				msg << "%s: %s is not valid for cpu %s.\nValid registers are: %s"	%
+				[reg.to_s, search[reg], db.cpu.class, db.regs.inspect]
+				msg << "or 'regs' (means all cpu registers)"
+				exit_with_arg_error(msg)
+		end
+end
+
+$verbosity = 0
+opt = {}
+opt[:info] = false
+opt[:db] = { :type => nil }
+
+search = {}
+search[:src] = []
+search[:dst] = []
+search[:limit] = 10
+
+search[:pre] = {}
+search[:post] = {}
+search[:any] = []
+
+
+opts = OptionParser.new do |opts|
+    opts.version = Skyrack::VERSION
+
+    opts.banner  = "Usage : #{opts.program_name} -f file.sqlite3 -a mov -d eax\n" % File.basename(__FILE__)
+    opts.banner += "        " + opts.ver
+
+    opts.separator "\nGeneral options"
+    opts.on("-v", "--verbosity", "Use more than once to increase verbosity") { $verbosity += 1 }
+    opts.on("-f", "--file FILENAME", String, "sqlite3 db") { |f| opt[:db][:type] = :sqlite; opt[:db][:filename] = f }
+    opts.on(      "--info", "display bin informations") { opt[:info] = true }
+
+    opts.separator "Search options"
+    opts.on("-a", "--anywhere instr1[|instr2[|...]]", String, "multiple instructions (xor eax, eax)") { |a| search[:any] << a.split('|') }
+    opts.on("-s", "--source      REG", Array, "source operand (rax, rbx...)")				{ |s| search[:src] = s }
+    opts.on("-d", "--destination REG", Array, "destination operand (rax, rbx...)")	{ |d| search[:dst] = d }
+    opts.on("-i", "--instruction INST", String, "instruction (mov eax, [ebx+1])")		{ |i| search[:instr] = Instr.assemble i }
+
+
+		opts.separator "Filtering options"
+    opts.on("-l", "--limit INT", Integer, "max result to display, 0 = no limit. Defaults to first 10 results")		{ |l| search[:limit] = l }
+    opts.on(      "--regs", "show only from and to CPU regs")												{ search[:pre][:regs] = true }
+    opts.on("-p", "--preserve-target", String, "first instruction's regsiter stays unaffected till ret") { |r| search[:post][:preserve_target] = true }
+    opts.on("-e", "--preserve-eip",    String, "instructions preserve eip (or rip) till ret")            { |r| search[:post][:preserve_eip] = true }
+		opts.on(      "--preserve-regs", Array, "preserve registers (rax,rbx...)")   	  { |r| search[:post][:preserve] = r }
+    opts.on(      "--address ADDR",    String, "search gadgets starting at @addr")				{ |a| search[:address] = a.to_i(16) }
+end
+
+opts.parse!
+
+# }}} end of arg parsing
+
+begin
+    db = GadgetDb.new(opt[:db][:filename])
+rescue GadgetDbException => e
+    $stderr.puts "no gadget database found (generate using sky_build_db or specify path using -f)"
+    exit(-1)
+end
+
+check_registers_args(search, db)
+
+search[:src] = db.regs + [''] if search[:src].first == 'reg'
+search[:dst] = db.regs + [''] if search[:dst].first == 'reg'
+
+search.delete :pre
+
+if search[:instr] then
+		raise "unimplemented"
+		expr = search[:instr].expr[:eax].reduce
+		db.find_equivalent_expr(expr) do |g|
+				puts g
+				exit
+		end
+elsif search[:address] then
+		puts db.gadget_build(search[:address]).to_s
+else
+		db.search_gadget(search) do |list|
+				if $verbosity >= 1 then
+						puts list.to_s
+				else
+						puts "0x%08x %s" % [list.base_addr, list.map {|i| i.to_s}.join(" ; ")]
+				end
+		end
+end

@@ -1,0 +1,68 @@
+#!/usr/bin/env ruby
+
+begin
+		require 'skyrack/roper'
+		require 'skyrack/instr'
+rescue LoadError
+		require 'rubygems'
+		require 'skyrack/roper'
+		require 'skyrack/instr'
+end
+
+# {{{ arg parsing
+require 'optparse'
+opt = {}
+opt[:raw] = []
+opt[:instr] = []
+opt[:all] = false
+
+opts = OptionParser.new do |opts|
+		opts.banner = "Usage : #{File.basename(__FILE__)} options file_to_scan"
+		opts.separator ""
+		opts.separator "Examples:"
+		opts.separator "          #{File.basename(__FILE__)} -r /\x90./"
+		opts.separator "          #{File.basename(__FILE__)} -i syscall"
+		opts.separator "          #{File.basename(__FILE__)} -i 'mov [eax], 0x42' -i mov [ebx}, 0x42"
+		opts.separator ""
+
+		opts.on("-r", "--raw Expr", String, "search this instruction")		 { |a| opt[:raw]   << Regexp.new(a.encode('BINARY')) }
+		opts.on("-i", "--instruction Instr", String, "search instruction") { |a| opt[:instr] << a }
+
+        opts.on("-a", "--all", "show all resutls") { |a| opt[:show_all] = true }
+end
+
+opts.parse!
+if ARGV.size == 0 then
+		puts opts
+		exit 1
+end
+
+opt[:filename] = ARGV[0]
+
+# }}}
+
+$stderr.puts "Decoding %s..." % opt[:filename]
+m = AutoExe.decode_file(opt[:filename])
+$stderr.puts "decoding done."
+
+Instr.cpu = m.cpu
+
+for instr in opt[:instr] do
+    instr =	Instr.assemble(instr)
+    $stderr.puts "looking for %s %s" % [instr.to_s, instr.bin.unpack('C*').map {|b| "%02x" % b }.join ]
+    m.search_str(instr.bin) do |addr|
+        puts "0x%08x %s" % [addr, instr]
+        break unless opt[:show_all]
+    end
+
+end
+
+for pattern in opt[:raw] do
+    found = []
+    m.search_raw(pattern) do |addr, raw|
+        next if found.include? raw
+        found << raw 
+        puts "0x%08x %s" % [addr, raw.unpack('C*').map { |i| "%02x" % i }]
+    end
+end
+

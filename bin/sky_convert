@@ -1,0 +1,50 @@
+#!/usr/bin/env ruby
+begin
+		require 'skyrack/roper'
+		require 'skyrack/gadget_db'
+rescue LoadError
+		require 'rubygems'
+		require 'skyrack/roper'
+		require 'skyrack/gadget_db'
+end
+
+# {{{ arg parsing
+require 'optparse'
+
+def exit_with_arg_error(opts, str=nil)
+    puts str if str
+    puts opts
+    exit 1
+end
+
+$verbosity = 0
+
+opts = OptionParser.new do |opts|
+    opts.banner = "Usage : %s src_exploit dst_db" % File.basename(__FILE__)
+    opts.banner << "\n converts src_template to offsets existing in dst_db"
+
+    opts.separator ""
+    opts.separator "General options"
+    opts.on("-v", "--verbosity", "Use more than once to increase verbosity") { $verbosity += 1 }
+
+end
+
+opts.parse!
+
+if ARGV.size != 2
+		puts opts 
+		exit 1
+end
+
+# }}} end of arg parsing
+
+src_exploit = ARGV[0]
+dst_db_file = ARGV[1]
+
+
+dst_db = GadgetDb.new(dst_db_file)
+
+chain = Payloads.translate_file(src_exploit, dst_db)
+
+puts chain.join("\n")
+

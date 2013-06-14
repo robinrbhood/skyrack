@@ -57,10 +57,10 @@ opts = OptionParser.new do |opts|
     opts.on(      "--info", "display bin informations") { opt[:info] = true }
 
     opts.separator "Search options"
-    opts.on("-a", "--anywhere instr1[|instr2[|...]]", String, "multiple instructions (xor eax, eax)") { |a| search[:any] << a.split('|') }
-    opts.on("-s", "--source      REG", Array, "source operand (rax, rbx...)")				{ |s| search[:src] = s }
-    opts.on("-d", "--destination REG", Array, "destination operand (rax, rbx...)")	{ |d| search[:dst] = d }
-    opts.on("-i", "--instruction INST", String, "instruction (mov eax, [ebx+1])")		{ |i| search[:instr] = Instr.assemble i }
+    opts.on("-a", "--anywhere instr", String, "multiple instructions (xor eax, eax). Can be used multiple times.")   { |a| search[:any] << a.split(/[;|]/) }
+    opts.on("-s", "--source      REG", Array, "source operand (rax, rbx...)")           { |s| search[:src] = s }
+    opts.on("-d", "--destination REG", Array, "destination operand (rax, rbx...)")      { |d| search[:dst] = d }
+    opts.on("-i", "--instruction INST", String, "instruction (mov eax, [ebx+1])")       { |i| search[:instr] = Instr.assemble i }
 
 
 		opts.separator "Filtering options"

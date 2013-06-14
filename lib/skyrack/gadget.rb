@@ -58,6 +58,23 @@ class Gadget < Array
         return 0
     end
 
+    # returns true if gadget matches instr_ary (non contiguously), e.g.:
+    # [pop r8; inc rax; pop r9] will match instr_ary ['pop r8', 'pop r9']
+    def include_str_ary?(instr_ary)
+        last_match = 0
+        found      = 0
+        instr_ary.each do |instr|
+            self[last_match..-1].each_with_index do |g_ins, idx|
+                if g_ins.to_s.index instr
+                    found += 1
+                    last_match += idx + 1
+                    break
+                end
+            end
+        end
+        return found == instr_ary.size
+    end
+
     def base_addr
         @base_addr ||= self.first.addr
     end
@@ -80,7 +97,7 @@ class Gadget < Array
     end
 
     def preserve_eip?
-        not self[1..-2].inject(false) { |s, i| op = i.instr.opcode.props;  s |= (op[:setip] || op[:stopexec]) } 
+        not self[1..-2].inject(false) { |s, i| op = i.instr.opcode.props;  s |= (op[:setip] || op[:stopexec]) }
     end
 
     def to_s

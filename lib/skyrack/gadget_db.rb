@@ -99,38 +99,23 @@ class GadgetDb
     def search_gadget(search)
         search_by_gadget(search) do |gadget|
             satisfy = true
-            satisfy &= gadget.preserve_target? if search[:post][:preserve_target]
-            satisfy &= gadget.preserve_eip?    if search[:post][:preserve_eip] && satisfy
-            satisfy &= gadget.preserve_regs(search[:post][:preserve]) if search[:post][:preserve] && satisfy
-            # FIXME multiple instructions search
-            search[:any][1..-1].each_with_index { |instrs, idx|
-                #			satisfy &= gadget[idx+1].to_s.index(instr) }
-                b = false
-                instrs.each { |instr|
-                    b |= gadget[idx+1].to_s.index(instr)
-                    break if b
-                }
-                satisfy &= b
-            } if search[:any].size > 1 && satisfy
+            satisfy &= gadget.preserve_target?                        if satisfy && search[:post][:preserve_target]
+            satisfy &= gadget.preserve_eip?                           if satisfy && search[:post][:preserve_eip]
+            satisfy &= gadget.preserve_regs(search[:post][:preserve]) if satisfy && search[:post][:preserve]
+            sub_satisfy = false
+            search[:any].each do |instr_ary|
+                sub_satisfy |= gadget.include_str_ary?(instr_ary)
+            end                                                       if satisfy && search[:any].size > 0
+            satisfy &= sub_satisfy
 
-
-
-            # satisfy &= (gadget[1].to_s.index search[:any][1]) if search[:any].size > 1
-
-            if satisfy
-                yield(gadget)
-                res = true
-            else
-                res = false
-            end
-            res
+            yield(gadget) if satisfy
+            satisfy
         end
     end
 
-
     def save_function(addrs, opts)
         num = 0
-        addrs.each do |addr| 
+        addrs.each do |addr|
             save_interesting_addr(addr, opts, num)
             num += 1
         end
@@ -168,8 +153,8 @@ class GadgetDb
             else
                 ret_distance = gadget.from_addr(instr.addr).size
             end
-            query = "INSERT INTO gadgets (address, opcode, arg1, arg2, bin, ret_addr, ret_distance) VALUES " 
-            query << save_instr_values(instr, ret_addr, ret_distance) 
+            query = "INSERT INTO gadgets (address, opcode, arg1, arg2, bin, ret_addr, ret_distance) VALUES "
+            query << save_instr_values(instr, ret_addr, ret_distance)
             sql(query)
         end
         #puts gadget.write_to_graphic_file('png', 'blah_%d.jpg' % gadget.ret_addr)
@@ -220,7 +205,9 @@ class GadgetDb
         search.each do |k, v|
             case k
             when :any
-                conds << "(%s)" % cond_any(v.first).join(' OR ') unless v.size == 0
+                v.each do |ary|
+                    conds << "((%s) AND ret_distance > %d)" % [cond_any(ary).join(' OR '), ary.size]
+                end
             when :address
                 conds += cond_by_addr(v) unless v.size == 0
             when :dst
@@ -241,7 +228,7 @@ class GadgetDb
             g = gadget_build(addr, ret_addr)
 
             next if g.nil? 
-            next if (idx = found.index(g))
+            next if found.include?(g)
 
             if yield(g) then
                 found << g
@@ -343,7 +330,7 @@ class GadgetDb
     # returns the address of an equivalent gadget found in the db,
     # or nil
     def find_equivalent(gadget)
-        search_by_gadget( {:any => [[gadget.first.to_s]], :dst => [gadget.size]} ) 	{ |found_gadget| 
+        search_by_gadget( {:any => [gadget.first.to_s], :dst => [gadget.size]} ) 	{ |found_gadget|
             return found_gadget if gadget == found_gadget
         }
         return nil

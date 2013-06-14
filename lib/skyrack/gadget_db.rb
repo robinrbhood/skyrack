@@ -265,7 +265,7 @@ class GadgetDb
     end
 
     def cond_by_dst(v)
-        "(%s)" % v.inject([]) { |a, dst| a << "ret_distance = %d" % dst.to_i }.join(' OR ')
+        "(%s)" % v.inject([]) { |a, dst| a << "arg1 = '%s'" % quote(dst) }.join(' OR ')
     end
 
     def reg_with_shared_bits(reg)

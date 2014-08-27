@@ -28,7 +28,7 @@ Fedora:
 
 You also need metasm:
 
-    $ hg clone https://metasm.googlecode.com/hg/ metasm 
+    $ hg clone https://metasm.googlecode.com/hg/ metasm
 
 or
 
@@ -36,7 +36,7 @@ or
 
 You'll then need yo set your Ruby path points to Metasm directory:
 
-    $ export RUBYLIB#$RUBYLIB:/path/to/metasm
+    $ export RUBYLIB=$RUBYLIB:/path/to/metasm
 
 ## Documentation
 
@@ -57,9 +57,9 @@ Search a gadget db built with +sky_build_db+:: for specific instructions.
 
 Examples:
 
-    $ sky_search -f db/libeay32.dll.sqlite3 -a 'mov eax' -s ebp+
+    $ sky_search -f db/libeay32.dll.sqlite3 -a 'mov eax' -s ebp
 
-    $ sky_search -f db/libeay32.dll.sqlite3 -a 'mov [eax]' -l -1 --preserve-eip+
+    $ sky_search -f db/libeay32.dll.sqlite3 -a 'mov [eax]' -l -1 --preserve-eip
 
 Interesting patterns found by sky_search should be redirected to a file :
 
@@ -141,6 +141,6 @@ Metasm: http://metasm.cr0.org/
         * sky_convert works better and faster
         * sky_convert does not need any more the original gadet database, only
           the destination one
-        * bigfux: sky_generate did not work with using Ruby 1.8 
+        * bigfux: sky_generate did not work with using Ruby 1.8
         * database is now looked for in current directory
 

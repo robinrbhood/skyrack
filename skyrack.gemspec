@@ -16,6 +16,7 @@ Gem::Specification.new do |s|
 
 	s.add_dependency("sqlite3")
 	s.add_dependency("rgl")
+	s.add_dependency("metasm")
 
 	exclude = %w(samples lib/skyrack/expr.rb todo.txt notes bin/sky_publish hscdemo doc notes pkg)
 

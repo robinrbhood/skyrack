@@ -26,18 +26,6 @@ Fedora:
    $ yum install sqlite3-devel'
 
 
-You also need metasm:
-
-    $ hg clone https://metasm.googlecode.com/hg/ metasm
-
-or
-
-   $ git clone git://github.com/jjyg/metasm.git
-
-You'll then need yo set your Ruby path points to Metasm directory:
-
-    $ export RUBYLIB=$RUBYLIB:/path/to/metasm
-
 ## Documentation
 
 Options can be seen by passing the '-h' or '--help' flag to each executable
